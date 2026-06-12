@@ -1,5 +1,5 @@
 const CACHE = 'hair-tracker-v2';
-const ASSETS = ['tracker.html', 'manifest.json', 'sw.js', 'icon.svg'];
+const ASSETS = ['index.html', 'manifest.json', 'sw.js', 'icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
