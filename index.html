@@ -560,4 +560,424 @@ input[type="date"]:focus, input[type="time"]:focus { border-color: var(--fin-bor
       Historial
     </button>
     <button class="tab-btn" onclick="switchTab('ajus',this)">
-      <svg viewBox="0 0 24 24" fill="none" st
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Ajustes
+    </button>
+  </nav>
+</div>
+
+<div id="photo-modal">
+  <button id="modal-close" onclick="closeModal()">✕</button>
+  <img id="modal-img" src="" alt="">
+</div>
+<input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)">
+
+<script>
+const DATA_KEY = 'ht_data_v2';
+const SET_KEY  = 'ht_settings_v2';
+
+const load  = () => { try { return JSON.parse(localStorage.getItem(DATA_KEY)) || {}; } catch { return {}; } };
+const save  = d => localStorage.setItem(DATA_KEY, JSON.stringify(d));
+const loadS = () => { const def = { startDate:'', notifAM:'08:00', notifPM:'21:00', notifEnabled:false }; try { return {...def,...(JSON.parse(localStorage.getItem(SET_KEY))||{})}; } catch { return def; } };
+const saveS = s => localStorage.setItem(SET_KEY, JSON.stringify(s));
+
+function saveSetting(k, v) { const s = loadS(); s[k] = v; saveS(s); }
+
+function getE(data, key) {
+  return data[key] || { fin:false, mino_am:false, mino_pm:false, note:'', photo:null };
+}
+function setE(data, key, e) { data[key] = e; save(data); }
+
+const pad = n => String(n).padStart(2,'0');
+function todayKey() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function fmtKey(d)  { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function addDays(key, n) { const d = new Date(key+'T12:00:00'); d.setDate(d.getDate()+n); return fmtKey(d); }
+function ago(n) { return addDays(todayKey(), -n); }
+function dow(key) { return new Date(key+'T12:00:00').getDay(); }
+function dimMonth(y, m) { return new Date(y, m, 0).getDate(); }
+function dateDiff(a, b) { return Math.round((new Date(b+'T12:00:00') - new Date(a+'T12:00:00')) / 86400000); }
+
+const MES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MES3 = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DIA3 = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+function fmtDisp(key) { const [y,m,d] = key.split('-').map(Number); return `${d} ${MES3[m-1]} ${y}`; }
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='hoy')  { renderBanner(); renderTodayCards(); renderStats(); }
+  if (name==='mes')  renderMonth();
+  if (name==='mapa') { renderHM('hm-fin','fin'); renderHM('hm-mino','mino'); }
+  if (name==='tend') renderTrend();
+  if (name==='hist') renderHistory();
+  if (name==='ajus') renderSettings();
+}
+
+function renderAll() {
+  renderBanner();
+  renderTodayCards();
+  renderStats();
+}
+
+function renderBanner() {
+  const data = load(); const s = loadS(); const today = todayKey();
+  let finStreak=0, minoStreak=0;
+  for (let i=0; i<730; i++) { if (getE(data,ago(i)).fin) finStreak++; else break; }
+  for (let i=0; i<730; i++) { const e=getE(data,ago(i)); if(e.mino_am||e.mino_pm) minoStreak++; else break; }
+  const daysSince = s.startDate ? dateDiff(s.startDate, today) : null;
+
+  let html = '<div class="banner">';
+  if (daysSince !== null) {
+    html += `<div class="banner-stat"><div class="val" style="color:var(--text)">${daysSince}</div><div class="lbl">Días de tratamiento</div></div><div class="banner-div"></div>`;
+  }
+  html += `
+    <div class="banner-stat"><div class="val" style="color:var(--fin)">${finStreak}</div><div class="lbl">Racha Fin.</div></div>
+    <div class="banner-div"></div>
+    <div class="banner-stat"><div class="val" style="color:var(--mino)">${minoStreak}</div><div class="lbl">Racha Mino.</div></div>
+  </div>`;
+  document.getElementById('hoy-banner').innerHTML = html;
+}
+
+function renderTodayCards() {
+  const data = load(); const key = todayKey(); const e = getE(data, key);
+  const minoN = (e.mino_am?1:0)+(e.mino_pm?1:0);
+
+  const photoHTML = e.photo
+    ? `<img class="photo-thumb" src="${e.photo}" onclick="openModal('${key}')">`
+    : `<div class="photo-add" onclick="triggerPhoto('${key}')">+</div>`;
+
+  document.getElementById('hoy-cards').innerHTML = `
+    <div class="card">
+      <div class="card-label">Medicamento oral</div>
+      <div class="drug-name">Finasteride</div>
+      <div class="drug-sub">1 mg · una vez al día</div>
+      <div class="btn-row">
+        <button class="btn ${e.fin?'btn-fin':''}" onclick="toggleFin()">${e.fin?'✓ Tomado':'Marcar toma'}</button>
+        ${e.fin?`<button class="btn btn-undo" onclick="undoFin()" title="Deshacer">↩</button>`:''}
+      </div>
+      <div class="status-text">${e.fin?'Registrado hoy':'Sin registrar hoy'}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Tópico</div>
+      <div class="drug-name">Minoxidil</div>
+      <div class="drug-sub">Tópico · hasta 2 veces al día</div>
+      <div class="btn-row">
+        <button class="btn ${e.mino_am?'btn-mino':''}" onclick="toggleMinoAM()">${e.mino_am?'✓ AM':'AM'}</button>
+        <button class="btn ${e.mino_pm?'btn-mino':''}" onclick="toggleMinoPM()">${e.mino_pm?'✓ PM':'PM'}</button>
+      </div>
+      <div class="status-text">${['Sin aplicar hoy','1 aplicación registrada','2 aplicaciones ✓'][minoN]}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Nota del día & foto de progreso</div>
+      <div class="photo-row">
+        ${photoHTML}
+        <div class="photo-meta">
+          ${e.photo?'Foto guardada · tocá para ver':'Agregá una foto de progreso (opcional)'}
+          ${e.photo?`<br><button class="btn-sm" onclick="removePhoto('${key}')">Quitar foto</button>`:''}
+        </div>
+      </div>
+      <textarea class="note-textarea" rows="2" placeholder="Notas del día... efectos, sensaciones, recordatorios" onchange="saveNote('${key}',this.value)">${e.note||''}</textarea>
+    </div>
+  `;
+}
+
+function renderStats() {
+  const data = load();
+  let fin=0, am=0, pm=0;
+  for (let i=0; i<90; i++) { const e=getE(data,ago(i)); if(e.fin)fin++; if(e.mino_am)am++; if(e.mino_pm)pm++; }
+  const fPct = Math.round(fin/90*100);
+  const mPct = Math.round((am+pm)/180*100);
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-val" style="color:var(--fin)">${fPct}%</div><div class="stat-lbl">Adherencia Fin.</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--fin)">${fin}/90</div><div class="stat-lbl">Tomas registradas</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--mino)">${mPct}%</div><div class="stat-lbl">Cobertura Mino.</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--mino)">${am+pm}/180</div><div class="stat-lbl">Aplicaciones Mino.</div></div>
+  `;
+}
+
+function toggleFin()    { mut(k => { const e=getE(k,todayKey()); e.fin=!e.fin; return e; }); }
+function undoFin()      { mut(k => { const e=getE(k,todayKey()); e.fin=false; return e; }); }
+function toggleMinoAM() { mut(k => { const e=getE(k,todayKey()); e.mino_am=!e.mino_am; return e; }); }
+function toggleMinoPM() { mut(k => { const e=getE(k,todayKey()); e.mino_pm=!e.mino_pm; return e; }); }
+function mut(fn) { const data=load(); const key=todayKey(); setE(data,key,fn(data)); renderAll(); }
+
+function saveNote(key, val) { const d=load(); const e=getE(d,key); e.note=val; setE(d,key,e); }
+
+let calY = new Date().getFullYear();
+let calM = new Date().getMonth()+1;
+let calSel = null;
+
+function monthNav(dir) {
+  calM += dir;
+  if (calM>12){calM=1;calY++;} if(calM<1){calM=12;calY--;}
+  renderMonth();
+}
+
+function renderMonth() {
+  const data = load(); const today = todayKey();
+  const total = dimMonth(calY, calM);
+  const firstKey = `${calY}-${pad(calM)}-01`;
+  const startDow = dow(firstKey);
+
+  document.getElementById('cal-title').textContent = `${MES[calM-1]} ${calY}`;
+
+  let html = DIA3.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for (let i=0;i<startDow;i++) html+=`<div class="cal-day empty"></div>`;
+
+  for (let d=1;d<=total;d++) {
+    const key=`${calY}-${pad(calM)}-${pad(d)}`;
+    const isFuture = key>today;
+    const isToday  = key===today;
+    const isSel    = key===calSel;
+    const e = getE(data, key);
+    const mn = (e.mino_am?1:0)+(e.mino_pm?1:0);
+
+    let bg='';
+    if (!isFuture) {
+      if (e.fin&&mn===2) bg='background:linear-gradient(135deg,var(--fin-bg),var(--mino-bg))';
+      else if (e.fin)    bg='background:var(--fin-bg)';
+      else if (mn>0)     bg='background:var(--mino-bg)';
+    }
+    const cls=['cal-day',isFuture?'future':'',isToday?'today':'',isSel?'selected':''].filter(Boolean).join(' ');
+    const dots=isFuture?``:
+      `<div class="cal-dots">
+        <div class="dot ${e.fin?'dot-fin':'dot-off'}"></div>
+        <div class="dot ${mn>0?'dot-mino':'dot-off'}"></div>
+      </div>`;
+    html+=`<div class="${cls}" style="${bg}" onclick="selectCalDay('${key}')">${d}${dots}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+  if (calSel) renderCalDetail(calSel);
+}
+
+function selectCalDay(key) {
+  const today = todayKey();
+  if (key>today) return;
+  calSel = (calSel===key) ? null : key;
+  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected'));
+  if (calSel) renderCalDetail(calSel);
+  else document.getElementById('cal-detail').innerHTML='';
+  renderMonth();
+}
+
+function renderCalDetail(key) {
+  const data=load(); const e=getE(data,key); const mn=(e.mino_am?1:0)+(e.mino_pm?1:0);
+  let html=`<div class="card day-detail">
+    <div class="card-label">${fmtDisp(key)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${e.note||e.photo?'12px':'0'}">
+      ${e.fin?`<span class="badge b-fin">Finasteride ✓</span>`:`<span class="badge b-miss">Finasteride ✗</span>`}
+      ${e.mino_am?`<span class="badge b-mino">Minoxidil AM ✓</span>`:`<span class="badge b-miss">AM ✗</span>`}
+      ${e.mino_pm?`<span class="badge b-mino">Minoxidil PM ✓</span>`:`<span class="badge b-miss">PM ✗</span>`}
+    </div>`;
+  if (e.note) html+=`<div style="font-size:0.8rem;color:var(--text-muted);font-style:italic;margin-bottom:10px">"${e.note}"</div>`;
+  if (e.photo) html+=`<img class="photo-thumb" src="${e.photo}" onclick="openModal('${key}')" style="width:80px;height:80px">`;
+  html+='</div>';
+  document.getElementById('cal-detail').innerHTML=html;
+}
+
+function renderHM(id, type) {
+  const data=load(); const today=todayKey();
+  const startRaw=ago(90);
+  const startKey=addDays(startRaw,-dow(startRaw));
+  const endKey=addDays(today,6-dow(today));
+
+  const weeks=[]; let cur=startKey;
+  while(cur<=endKey){
+    const w=[]; for(let d=0;d<7;d++){w.push(cur);cur=addDays(cur,1);} weeks.push(w);
+  }
+
+  let lastM=null, mHtml='<div class="hm-months">';
+  weeks.forEach(w=>{
+    const m=parseInt(w[0].split('-')[1]);
+    mHtml+=`<span class="hm-month-lbl" style="width:${12+3}px">${m!==lastM?MES3[m-1]:''}</span>`;
+    lastM=m;
+  });
+  mHtml+='</div>';
+
+  let bHtml='<div class="hm-body">';
+  weeks.forEach(w=>{
+    bHtml+='<div class="hm-week">';
+    w.forEach(k=>{
+      if(k>today){bHtml+=`<div class="hm-cell future"></div>`;return;}
+      const e=getE(data,k);
+      let cls,tip;
+      if(type==='fin'){
+        cls=e.fin?'fc-1':'fc-0';
+        tip=`${fmtDisp(k)}: ${e.fin?'Tomado':'No registrado'}`;
+      } else {
+        const n=(e.mino_am?1:0)+(e.mino_pm?1:0);
+        cls=`mc-${n}`;
+        tip=`${fmtDisp(k)}: ${['No aplicado','1 aplicación','2 aplicaciones'][n]}`;
+      }
+      bHtml+=`<div class="hm-cell ${cls}" data-tip="${tip}"></div>`;
+    });
+    bHtml+='</div>';
+  });
+  bHtml+='</div>';
+
+  const legend = type==='fin'
+    ? `<span>No</span><div class="hm-legend-cell fc-0" style="border:1px solid var(--text-dim)"></div><div class="hm-legend-cell fc-1"></div><span>Tomado</span>`
+    : `<span>0</span><div class="hm-legend-cell mc-0" style="border:1px solid var(--text-dim)"></div><div class="hm-legend-cell mc-1"></div><div class="hm-legend-cell mc-2"></div><span>2 aplicaciones</span>`;
+
+  document.getElementById(id).innerHTML = mHtml+bHtml+`<div class="hm-legend">${legend}</div>`;
+}
+
+function renderTrend() {
+  const data=load(); const today=todayKey(); const W=12;
+  const weeks=[];
+  for(let w=W-1;w>=0;w--){
+    let fin=0,mino=0,days=0;
+    for(let d=0;d<7;d++){
+      const k=ago(w*7+d); if(k>today)continue; days++;
+      const e=getE(data,k); if(e.fin)fin++; mino+=(e.mino_am?1:0)+(e.mino_pm?1:0);
+    }
+    const k=ago(w*7+6); const [,m,d]=k.split('-').map(Number);
+    weeks.push({fin:days?Math.round(fin/days*100):0, mino:days?Math.round(mino/(days*2)*100):0, lbl:days?`${d}/${m}`:''});
+  }
+
+  const VW=760, VH=200, pt=14, pr=8, pb=32, pl=34;
+  const cW=VW-pl-pr, cH=VH-pt-pb;
+  const bW=Math.max(4,Math.floor(cW/(W*2+W+1))-1);
+  const step=cW/W;
+
+  let svg=`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;min-width:380px;height:auto;display:block">`;
+
+  [0,25,50,75,100].forEach(v=>{
+    const y=pt+cH-(v/100)*cH;
+    svg+=`<line x1="${pl}" y1="${y}" x2="${VW-pr}" y2="${y}" stroke="#252442" stroke-width="1"/>`;
+    svg+=`<text x="${pl-4}" y="${y+4}" text-anchor="end" font-size="9" fill="#6e6b8a">${v}%</text>`;
+  });
+
+  weeks.forEach((wk,i)=>{
+    const gx=pl+i*step;
+    const fH=(wk.fin/100)*cH; const mH=(wk.mino/100)*cH;
+    if(fH>0) svg+=`<rect x="${gx}" y="${pt+cH-fH}" width="${bW}" height="${fH}" rx="2" fill="#7c3aed"/>`;
+    if(mH>0) svg+=`<rect x="${gx+bW+3}" y="${pt+cH-mH}" width="${bW}" height="${mH}" rx="2" fill="#0891b2"/>`;
+    if(wk.lbl) svg+=`<text x="${gx+bW}" y="${VH-7}" text-anchor="middle" font-size="8.5" fill="#6e6b8a">${wk.lbl}</text>`;
+  });
+
+  svg+='</svg>';
+  document.getElementById('trend-chart').innerHTML=svg;
+}
+
+let histLimit=20;
+
+function renderHistory() {
+  const data=load(); let html='';
+  for(let i=0;i<Math.min(histLimit,90);i++){
+    const k=ago(i); const e=getE(data,k); const [y,m,d]=k.split('-').map(Number);
+    html+=`<div class="hist-row">
+      <div class="hist-date"><strong>${d} ${MES3[m-1]}</strong><small>${y}${i===0?' · hoy':''}</small></div>
+      <div class="hist-body">
+        <div class="hist-badges">
+          ${e.fin?`<span class="badge b-fin">Fin ✓</span>`:`<span class="badge b-miss">Fin ✗</span>`}
+          ${e.mino_am?`<span class="badge b-mino">AM ✓</span>`:`<span class="badge b-miss">AM ✗</span>`}
+          ${e.mino_pm?`<span class="badge b-mino">PM ✓</span>`:`<span class="badge b-miss">PM ✗</span>`}
+        </div>
+        ${e.note?`<div class="hist-note">"${e.note}"</div>`:''}
+      </div>
+      ${e.photo?`<img class="hist-photo" src="${e.photo}" onclick="openModal('${k}')">`:``}
+    </div>`;
+  }
+  if (!html) html='<div style="text-align:center;color:var(--text-muted);padding:24px;font-size:0.82rem">Sin registros aún</div>';
+  const showMore = histLimit<90 ? `<button class="show-more-btn" onclick="histLimit+=20;renderHistory()">Mostrar más</button>` : '';
+  document.getElementById('hist-list').innerHTML=html+showMore;
+}
+
+function renderSettings() {
+  const s=loadS();
+  document.getElementById('set-start').value=s.startDate||'';
+  document.getElementById('set-am').value=s.notifAM||'08:00';
+  document.getElementById('set-pm').value=s.notifPM||'21:00';
+  document.getElementById('set-notif').checked=s.notifEnabled||false;
+  updateNotifLabel();
+}
+
+function updateNotifLabel() {
+  const perm='Notification'in window?Notification.permission:'unsupported';
+  const s=loadS(); const el=document.getElementById('notif-status'); if(!el)return;
+  if(perm==='unsupported') el.textContent='No disponible en este navegador';
+  else if(perm==='denied') el.textContent='Bloqueadas — habilitá en ajustes del navegador';
+  else if(perm==='granted'&&s.notifEnabled) el.textContent=`Activas · ${s.notifAM} y ${s.notifPM}`;
+  else el.textContent='Desactivadas';
+}
+
+async function toggleNotif(enabled) {
+  if(enabled&&'Notification'in window){
+    const p=await Notification.requestPermission();
+    if(p!=='granted'){document.getElementById('set-notif').checked=false;saveSetting('notifEnabled',false);updateNotifLabel();return;}
+  }
+  saveSetting('notifEnabled',enabled);
+  updateNotifLabel();
+  if(enabled) startNotifLoop();
+}
+
+function startNotifLoop() {
+  setInterval(()=>{
+    const s=loadS(); if(!s.notifEnabled||Notification.permission!=='granted') return;
+    const now=new Date(); const hm=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const data=load(); const e=getE(data,todayKey());
+    if(hm===s.notifAM&&!e.mino_am) new Notification('Hair Tracker',{body:'Recordatorio: aplicar Minoxidil AM.',silent:false});
+    if(hm===s.notifPM&&(!e.fin||!e.mino_pm)) new Notification('Hair Tracker',{body:'Recordatorio: tomar Finasteride y aplicar Minoxidil PM.',silent:false});
+  },60000);
+}
+
+let photoKey=null;
+
+function triggerPhoto(key) { photoKey=key; document.getElementById('photo-input').click(); }
+
+function handlePhoto(ev) {
+  const file=ev.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=500, c=document.createElement('canvas');
+      let w=img.width, h=img.height;
+      if(w>h){if(w>MAX){h=h*MAX/w;w=MAX;}}else{if(h>MAX){w=w*MAX/h;h=MAX;}}
+      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      const compressed=c.toDataURL('image/jpeg',0.75);
+      const data=load(); const entry=getE(data,photoKey); entry.photo=compressed; setE(data,photoKey,entry);
+      renderTodayCards();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+  ev.target.value='';
+}
+
+function removePhoto(key) { const d=load();const e=getE(d,key);e.photo=null;setE(d,key,e);renderTodayCards(); }
+
+function openModal(key) {
+  const e=getE(load(),key); if(!e.photo)return;
+  document.getElementById('modal-img').src=e.photo;
+  document.getElementById('photo-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('photo-modal').classList.remove('open'); }
+document.getElementById('photo-modal').onclick=e=>{if(e.target===e.currentTarget)closeModal();};
+
+function exportCSV() {
+  const data=load(); let csv='Fecha,Finasteride,Mino_AM,Mino_PM,Nota\n';
+  for(let i=89;i>=0;i--){
+    const k=ago(i); const e=getE(data,k);
+    csv+=`${k},${e.fin?1:0},${e.mino_am?1:0},${e.mino_pm?1:0},"${(e.note||'').replace(/"/g,'""')}"\n`;
+  }
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`hair-tracker-${todayKey()}.csv`;
+  a.click();
+}
+
+if('serviceWorker'in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+renderAll();
+const _s=loadS();
+if(_s.notifEnabled&&'Notification'in window&&Notification.permission==='granted') startNotifLoop();
+</script>
+</body>
+</html>
