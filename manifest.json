@@ -2,7 +2,7 @@
   "name": "Hair Tracker",
   "short_name": "HairTracker",
   "description": "Tracker de Finasteride y Minoxidil",
-  "start_url": "/tracker.html",
+  "start_url": "/hairloss-tracker/",
   "display": "standalone",
   "background_color": "#090912",
   "theme_color": "#090912",
