@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#08070f">
+<link rel="manifest" href="manifest.json">
+<title>Hair Tracker</title>
+<style>
+:root {
+  --bg: #08070f;
+  --surface: rgba(22, 20, 38, 0.55);
+  --surface-solid: #14121f;
+  --surface2: rgba(255, 255, 255, 0.04);
+  --surface2-hover: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #ece9fb;
+  --text-muted: #8c88a8;
+  --text-dim: #38344f;
+
+  --fin: #a78bfa;
+  --fin-soft: #c4b5fd;
+  --fin-deep: #7c3aed;
+  --fin-bg: rgba(124, 58, 237, 0.12);
+  --fin-border: rgba(139, 92, 246, 0.45);
+  --fin-grad: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  --fin-glow: rgba(139, 92, 246, 0.35);
+
+  --mino: #2dd4ee;
+  --mino-soft: #67e8f9;
+  --mino-deep: #0891b2;
+  --mino-bg: rgba(8, 145, 178, 0.12);
+  --mino-border: rgba(34, 211, 238, 0.4);
+  --mino-grad: linear-gradient(135deg, #22d3ee, #0e7490);
+  --mino-glow: rgba(34, 211, 238, 0.3);
+
+  --danger: #fb7185;
+  --danger-bg: rgba(244, 63, 94, 0.1);
+
+  --radius-lg: 20px;
+  --radius: 15px;
+  --radius-sm: 10px;
+  --tab-h: 66px;
+  --shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.7);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif; font-size: 15px; overscroll-behavior: none; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body { position: relative; }
+
+/* Ambient background glows */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(680px 480px at 12% -8%, rgba(124, 58, 237, 0.22), transparent 60%),
+    radial-gradient(620px 520px at 95% 8%, rgba(14, 116, 144, 0.18), transparent 55%),
+    radial-gradient(700px 700px at 50% 120%, rgba(109, 40, 217, 0.12), transparent 60%);
+}
+
+#app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; max-width: 640px; margin: 0 auto; }
+#content { flex: 1; overflow-y: auto; padding: 24px 18px calc(var(--tab-h) + env(safe-area-inset-bottom) + 20px); }
+#content::-webkit-scrollbar { width: 0; }
+
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+/* ───── Tab bar ───── */
+#tabs {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 640px;
+  background: rgba(12, 10, 22, 0.82); backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-top: 1px solid var(--border); display: flex; z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-btn {
+  position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; height: var(--tab-h); background: none; border: none; color: var(--text-muted);
+  font-size: 0.56rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer;
+  transition: color 0.2s ease;
+}
+.tab-btn svg { width: 21px; height: 21px; stroke-width: 1.7; transition: transform 0.2s ease; }
+.tab-btn.active { color: var(--fin-soft); }
+.tab-btn.active svg { transform: translateY(-1px); }
+.tab-btn.active::before {
+  content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 26px; height: 3px; border-radius: 0 0 4px 4px; background: var(--fin-grad);
+  box-shadow: 0 0 12px var(--fin-glow);
+}
+
+.section { display: none; animation: secIn 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.section.active { display: block; }
+@keyframes secIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ───── Cards ───── */
+.card {
+  position: relative; background: var(--surface);
+  backdrop-filter: blur(16px) saturate(130%); -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 13px;
+  box-shadow: var(--shadow);
+}
+.card-label { font-size: 0.61rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 9px; }
+
+.sec-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+  margin: 24px 2px 12px;
+}
+.sec-title:first-child { margin-top: 0; }
+.sec-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-strong), transparent); }
+
+/* ───── Hero ───── */
+.hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(150deg, rgba(124, 58, 237, 0.18), rgba(14, 116, 144, 0.1) 70%), var(--surface-solid);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 20px;
+  margin-bottom: 6px; box-shadow: var(--shadow);
+}
+.hero::after {
+  content: ''; position: absolute; top: -40%; right: -20%; width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.16), transparent 70%); pointer-events: none;
+}
+.hero-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.hero-day-num { font-size: 2.9rem; font-weight: 800; line-height: 0.95; letter-spacing: -0.03em; background: linear-gradient(120deg, #fff, var(--fin-soft) 70%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero-day-lbl { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.04em; margin-top: 4px; }
+.hero-ring { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
+.hero-ring svg { width: 84px; height: 84px; transform: rotate(-90deg); }
+.hero-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hero-ring-frac { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+.hero-ring-lbl { font-size: 0.5rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-top: 1px; }
+
+.hero-streaks { display: flex; gap: 10px; margin-top: 18px; position: relative; }
+.streak-pill { flex: 1; display: flex; align-items: center; gap: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.streak-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.streak-ic svg { width: 16px; height: 16px; }
+.streak-ic.fin { background: var(--fin-bg); color: var(--fin); }
+.streak-ic.mino { background: var(--mino-bg); color: var(--mino); }
+.streak-info { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.streak-val { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.02em; }
+.streak-cap { font-size: 0.58rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ───── Med cards ───── */
+.med-head { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; }
+.med-icon { width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }
+.med-icon svg { width: 23px; height: 23px; }
+.med-icon.fin { background: var(--fin-bg); color: var(--fin); box-shadow: inset 0 0 0 1px var(--fin-border); }
+.med-icon.mino { background: var(--mino-bg); color: var(--mino); box-shadow: inset 0 0 0 1px var(--mino-border); }
+.med-titles { flex: 1; min-width: 0; }
+.drug-name { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.01em; }
+.drug-sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+.med-check { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; font-weight: 800; }
+.med-check.on-fin { background: var(--fin-grad); color: #fff; box-shadow: 0 0 14px var(--fin-glow); }
+.med-check.on-mino { background: var(--mino-grad); color: #06222b; box-shadow: 0 0 14px var(--mino-glow); }
+.med-check.off { background: var(--surface2); color: var(--text-dim); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+
+.btn-row { display: flex; gap: 9px; }
+.btn {
+  flex: 1; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+  background: var(--surface2); color: var(--text); font-size: 0.86rem; font-weight: 600; cursor: pointer;
+  transition: transform 0.12s ease, background 0.18s ease, box-shadow 0.18s ease;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-undo { flex: 0 0 auto; padding: 12px 14px; color: var(--text-muted); }
+.btn-fin { background: var(--fin-grad); border-color: transparent; color: #fff; box-shadow: 0 6px 18px -6px var(--fin-glow); }
+.btn-mino { background: var(--mino-grad); border-color: transparent; color: #06222b; box-shadow: 0 6px 18px -6px var(--mino-glow); }
+.btn-mino-ghost { background: var(--mino-bg); border-color: var(--mino-border); color: var(--mino-soft); }
+.status-text { font-size: 0.74rem; color: var(--text-muted); margin-top: 11px; min-height: 1em; display: flex; align-items: center; gap: 6px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+.status-dot.done { background: var(--mino); box-shadow: 0 0 8px var(--mino-glow); }
+
+/* ───── Mino application entries ───── */
+.app-entry { display: flex; align-items: center; gap: 12px; background: var(--mino-bg); border: 1px solid var(--mino-border); border-radius: var(--radius-sm); padding: 11px 13px; margin-bottom: 9px; }
+.app-entry-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--mino); box-shadow: 0 0 10px var(--mino-glow); flex-shrink: 0; }
+.app-entry-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+.app-entry-num { font-size: 0.62rem; color: var(--mino-soft); font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; }
+.app-entry-time { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
+.app-remove { background: none; border: none; color: var(--text-muted); width: 30px; height: 30px; border-radius: 8px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.15s, background 0.15s; }
+.app-remove:hover { color: var(--danger); background: var(--danger-bg); }
+
+.note-textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 0.83rem; font-family: inherit; padding: 11px 13px; resize: none; outline: none; transition: border-color 0.18s, background 0.18s; margin-top: 11px; line-height: 1.55; }
+.note-textarea:focus { border-color: var(--fin-border); background: rgba(255,255,255,0.06); }
+.note-textarea::placeholder { color: var(--text-muted); }
+
+.photo-row { display: flex; align-items: center; gap: 13px; margin-top: 11px; }
+.photo-thumb { width: 60px; height: 60px; border-radius: var(--radius-sm); object-fit: cover; cursor: pointer; border: 1px solid var(--border-strong); }
+.photo-add { width: 60px; height: 60px; border-radius: var(--radius-sm); border: 1.5px dashed var(--border-strong); background: var(--surface2); color: var(--text-muted); font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.18s, color 0.18s; flex-shrink: 0; }
+.photo-add:hover { border-color: var(--fin-border); color: var(--fin); }
+.photo-meta { font-size: 0.74rem; color: var(--text-muted); line-height: 1.55; }
+.btn-sm { padding: 5px 11px; font-size: 0.71rem; background: var(--surface2); border: 1px solid var(--border-strong); border-radius: 7px; color: var(--text-muted); cursor: pointer; margin-top: 6px; display: inline-block; transition: color 0.15s; }
+.btn-sm:hover { color: var(--text); }
+
+/* ───── Stats ───── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.stat-card { background: var(--surface); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; box-shadow: var(--shadow); }
+.stat-top { display: flex; align-items: baseline; justify-content: space-between; }
+.stat-val { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; }
+.stat-sub { font-size: 0.68rem; color: var(--text-muted); font-weight: 600; }
+.stat-lbl { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+.stat-bar { height: 5px; border-radius: 3px; background: var(--surface2); margin-top: 11px; overflow: hidden; }
+.stat-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s cubic-bezier(0.22,1,0.36,1); }
+.stat-bar-fill.fin { background: var(--fin-grad); }
+.stat-bar-fill.mino { background: var(--mino-grad); }
+
+/* ───── Calendar ───── */
+.cal-nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.cal-nav-row h2 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+.cal-nav { background: var(--surface2); border: 1px solid var(--border); width: 36px; height: 36px; border-radius: 10px; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.15s, background 0.15s; }
+.cal-nav:hover { color: var(--text); background: var(--surface2-hover); }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 5px; }
+.cal-dow { text-align: center; font-size: 0.57rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 0 7px; }
+.cal-day { aspect-ratio: 1; border-radius: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 600; cursor: pointer; background: var(--surface2); border: 1.5px solid transparent; position: relative; transition: border-color 0.15s, transform 0.1s; gap: 2px; }
+.cal-day:active { transform: scale(0.92); }
+.cal-day.empty { background: transparent; pointer-events: none; }
+.cal-day.today { box-shadow: inset 0 0 0 1.5px var(--fin-border); }
+.cal-day.future { opacity: 0.28; pointer-events: none; }
+.cal-day.selected { border-color: var(--fin) !important; box-shadow: 0 0 16px -4px var(--fin-glow); }
+.cal-dots { display: flex; gap: 3px; position: absolute; bottom: 6px; }
+.dot { width: 5px; height: 5px; border-radius: 50%; }
+.dot-fin { background: var(--fin); box-shadow: 0 0 6px var(--fin-glow); }
+.dot-mino { background: var(--mino); box-shadow: 0 0 6px var(--mino-glow); }
+.dot-off { background: var(--text-dim); }
+
+.day-detail { margin-top: 13px; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ───── Heatmap ───── */
+.hm-scroll { overflow-x: auto; padding-bottom: 4px; }
+.hm-scroll::-webkit-scrollbar { height: 5px; }
+.hm-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+.hm-months { display: flex; gap: 3px; margin-bottom: 6px; }
+.hm-month-lbl { font-size: 0.6rem; color: var(--text-muted); white-space: nowrap; font-weight: 600; }
+.hm-body { display: flex; gap: 3px; }
+.hm-week { display: flex; flex-direction: column; gap: 3px; }
+.hm-cell { width: 13px; height: 13px; border-radius: 3px; position: relative; flex-shrink: 0; }
+.hm-cell:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%); background: #15131f; border: 1px solid var(--border-strong); color: var(--text); font-size: 0.68rem; white-space: nowrap; padding: 5px 9px; border-radius: 7px; z-index: 30; pointer-events: none; box-shadow: var(--shadow); }
+.hm-cell.future { background: transparent !important; border: none !important; }
+.fc-0 { background: var(--surface2); box-shadow: inset 0 0 0 1px var(--border); }
+.fc-1 { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+.mc-0 { background: var(--surface2); box-shadow: inset 0 0 0 1px var(--border); }
+.mc-1 { background: rgba(34, 211, 238, 0.45); }
+.mc-2 { background: linear-gradient(135deg, #22d3ee, #0891b2); }
+.hm-legend { display: flex; align-items: center; gap: 6px; margin-top: 13px; font-size: 0.68rem; color: var(--text-muted); }
+.hm-legend-cell { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+
+/* ───── Trend ───── */
+.chart-scroll { overflow-x: auto; }
+.chart-legend { display: flex; gap: 18px; margin-top: 14px; font-size: 0.73rem; color: var(--text-muted); }
+.chart-legend span { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+
+/* ───── History ───── */
+.hist-row { display: flex; align-items: flex-start; gap: 13px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.hist-row:last-child { border-bottom: none; }
+.hist-date { min-width: 58px; text-align: center; }
+.hist-date .d { font-size: 1.25rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.hist-date .m { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-top: 2px; }
+.hist-date .y { font-size: 0.6rem; color: var(--text-dim); margin-top: 1px; }
+.hist-divider { width: 1px; align-self: stretch; background: var(--border); }
+.hist-body { flex: 1; min-width: 0; }
+.hist-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge { padding: 4px 9px; border-radius: 7px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.01em; }
+.b-fin { background: var(--fin-bg); color: var(--fin-soft); border: 1px solid var(--fin-border); }
+.b-mino { background: var(--mino-bg); color: var(--mino-soft); border: 1px solid var(--mino-border); }
+.b-miss { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(244,63,94,0.3); }
+.hist-note { font-size: 0.75rem; color: var(--text-muted); font-style: italic; margin-top: 7px; }
+.hist-photo { width: 46px; height: 46px; border-radius: 9px; object-fit: cover; border: 1px solid var(--border-strong); cursor: pointer; flex-shrink: 0; }
+.hist-edit-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 0.7rem; font-weight: 600; padding: 4px 11px; cursor: pointer; margin-top: 9px; display: inline-flex; align-items: center; gap: 5px; transition: color 0.15s, background 0.15s; }
+.hist-edit-btn:hover { color: var(--text); background: var(--surface2-hover); }
+.hist-edit-btn svg { width: 12px; height: 12px; }
+
+/* ───── Settings ───── */
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border-bottom: none; }
+.setting-lbl { font-size: 0.9rem; font-weight: 600; }
+.setting-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
+input[type="date"], input[type="time"] { background: var(--surface2); border: 1px solid var(--border-strong); border-radius: 9px; color: var(--text); font-size: 0.83rem; padding: 8px 11px; outline: none; font-family: inherit; flex-shrink: 0; transition: border-color 0.15s; }
+input[type="date"]:focus, input[type="time"]:focus { border-color: var(--fin-border); }
+
+.toggle { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-track { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border-strong); border-radius: 26px; cursor: pointer; transition: background 0.25s, border-color 0.25s; }
+.toggle-track::before { content: ''; position: absolute; width: 19px; height: 19px; background: var(--text-muted); border-radius: 50%; top: 2.5px; left: 2.5px; transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), background 0.25s; }
+.toggle input:checked + .toggle-track { background: var(--fin-grad); border-color: transparent; }
+.toggle input:checked + .toggle-track::before { transform: translateX(20px); background: #fff; }
+
+.export-btn { width: 100%; padding: 13px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface2); color: var(--text-muted); font-size: 0.85rem; font-weight: 700; cursor: pointer; margin-top: 12px; letter-spacing: 0.02em; display: flex; align-items: center; justify-content: center; gap: 8px; transition: color 0.15s, background 0.15s; }
+.export-btn:hover { color: var(--text); background: var(--surface2-hover); }
+.export-btn svg { width: 16px; height: 16px; }
+
+.info-card { margin-top: 16px; font-size: 0.74rem; color: var(--text-muted); line-height: 1.75; background: var(--surface); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+
+.show-more-btn { width: 100%; padding: 11px; margin-top: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: color 0.15s, background 0.15s; }
+.show-more-btn:hover { background: var(--surface2-hover); color: var(--text); }
+
+/* ───── Photo lightbox ───── */
+#photo-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+#photo-modal.open { display: flex; animation: fadeIn 0.2s ease; }
+#photo-modal img { max-width: 100%; max-height: 80vh; border-radius: var(--radius); object-fit: contain; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+#modal-close { position: absolute; top: 18px; right: 18px; background: rgba(255,255,255,0.12); border: none; color: white; font-size: 1.2rem; cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+/* ───── Edit bottom sheet ───── */
+#edit-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 150; align-items: flex-end; justify-content: center; }
+#edit-modal.open { display: flex; }
+#edit-modal-sheet { background: var(--surface-solid); border: 1px solid var(--border-strong); border-bottom: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; padding: 10px 18px calc(env(safe-area-inset-bottom) + 26px); box-shadow: 0 -16px 50px rgba(0,0,0,0.5); animation: sheetUp 0.3s cubic-bezier(0.22,1,0.36,1); }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+.sheet-handle { width: 40px; height: 4px; border-radius: 3px; background: var(--border-strong); margin: 0 auto 16px; }
+.edit-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.edit-header h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+.edit-close { background: var(--surface2); border: 1px solid var(--border); width: 32px; height: 32px; border-radius: 9px; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.edit-lbl { font-size: 0.61rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 9px; margin-top: 20px; }
+.edit-lbl:first-of-type { margin-top: 0; }
+.edit-app-row { display: flex; align-items: center; gap: 11px; background: var(--mino-bg); border: 1px solid var(--mino-border); border-radius: var(--radius-sm); padding: 11px 13px; margin-bottom: 9px; }
+.edit-app-label { font-size: 0.7rem; color: var(--mino-soft); font-weight: 700; flex: 1; }
+.edit-app-row input[type="time"] { background: var(--surface2); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-size: 0.9rem; padding: 6px 9px; }
+.edit-app-remove { background: none; border: none; color: var(--text-muted); width: 30px; height: 30px; border-radius: 8px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.15s, background 0.15s; }
+.edit-app-remove:hover { color: var(--danger); background: var(--danger-bg); }
+.edit-save { width: 100%; padding: 14px; border-radius: var(--radius-sm); border: none; background: var(--fin-grad); color: #fff; font-size: 0.92rem; font-weight: 700; cursor: pointer; margin-top: 24px; box-shadow: 0 8px 22px -8px var(--fin-glow); transition: transform 0.12s; }
+.edit-save:active { transform: scale(0.98); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="content">
+    <!-- HOY -->
+    <section class="section active" id="sec-hoy">
+      <div id="hoy-hero"></div>
+      <div class="sec-title">Registro de hoy</div>
+      <div id="hoy-cards"></div>
+      <div class="sec-title">Últimos 90 días</div>
+      <div class="stats-grid" id="stats-grid"></div>
+    </section>
+
+    <!-- MES -->
+    <section class="section" id="sec-mes">
+      <div class="card">
+        <div class="cal-nav-row">
+          <button class="cal-nav" onclick="monthNav(-1)">‹</button>
+          <h2 id="cal-title"></h2>
+          <button class="cal-nav" onclick="monthNav(1)">›</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <div id="cal-detail"></div>
+    </section>
+
+    <!-- MAPA -->
+    <section class="section" id="sec-mapa">
+      <div class="card">
+        <div class="sec-title" style="margin-top:0">Finasteride · toma diaria</div>
+        <div class="hm-scroll" id="hm-fin"></div>
+      </div>
+      <div class="card">
+        <div class="sec-title" style="margin-top:0">Minoxidil · aplicaciones</div>
+        <div class="hm-scroll" id="hm-mino"></div>
+      </div>
+    </section>
+
+    <!-- TENDENCIA -->
+    <section class="section" id="sec-tend">
+      <div class="card">
+        <div class="sec-title" style="margin-top:0">Adherencia semanal · últimas 12 semanas</div>
+        <div class="chart-scroll" id="trend-chart"></div>
+        <div class="chart-legend">
+          <span><div class="legend-dot" style="background:var(--fin-grad)"></div> Finasteride</span>
+          <span><div class="legend-dot" style="background:var(--mino-grad)"></div> Minoxidil</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORIAL -->
+    <section class="section" id="sec-hist">
+      <div class="card" id="hist-list"></div>
+      <button class="export-btn" onclick="exportCSV()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar historial a CSV
+      </button>
+    </section>
+
+    <!-- AJUSTES -->
+    <section class="section" id="sec-ajus">
+      <div class="card">
+        <div class="setting-row">
+          <div><div class="setting-lbl">Inicio del tratamiento</div><div class="setting-sub">Para calcular días totales</div></div>
+          <input type="date" id="set-start" onchange="saveSetting('startDate',this.value);renderAll()">
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-lbl">Recordatorio mañana</div><div class="setting-sub">Solo Minoxidil AM</div></div>
+          <input type="time" id="set-am" onchange="saveSetting('notifAM',this.value)">
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-lbl">Recordatorio noche</div><div class="setting-sub">Finasteride + Minoxidil PM</div></div>
+          <input type="time" id="set-pm" onchange="saveSetting('notifPM',this.value)">
+        </div>
+        <div class="setting-row">
+          <div><div class="setting-lbl">Notificaciones</div><div class="setting-sub" id="notif-status">Desactivadas</div></div>
+          <label class="toggle">
+            <input type="checkbox" id="set-notif" onchange="toggleNotif(this.checked)">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+      <button class="export-btn" onclick="exportCSV()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar historial a CSV
+      </button>
+      <div class="info-card">
+        <strong style="color:var(--text)">Instalar en el celular</strong><br>
+        Android (Chrome): menú ··· → "Agregar a pantalla de inicio"<br>
+        iPhone (Safari): compartir → "Agregar a pantalla de inicio"
+      </div>
+    </section>
+  </div>
+
+  <nav id="tabs">
+    <button class="tab-btn active" onclick="switchTab('hoy',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+      Hoy
+    </button>
+    <button class="tab-btn" onclick="switchTab('mes',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>
+      Mes
+    </button>
+    <button class="tab-btn" onclick="switchTab('mapa',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+      Mapa
+    </button>
+    <button class="tab-btn" onclick="switchTab('tend',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Tendencia
+    </button>
+    <button class="tab-btn" onclick="switchTab('hist',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2.5H6a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8.5z"/><polyline points="14 2.5 14 8.5 20 8.5"/><line x1="15.5" y1="13" x2="8.5" y2="13"/><line x1="15.5" y1="17" x2="8.5" y2="17"/></svg>
+      Historial
+    </button>
+    <button class="tab-btn" onclick="switchTab('ajus',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Ajustes
+    </button>
+  </nav>
+</div>
+
+<!-- Photo lightbox -->
+<div id="photo-modal">
+  <button id="modal-close" onclick="closeModal()">✕</button>
+  <img id="modal-img" src="" alt="">
+</div>
+
+<!-- Edit record bottom sheet -->
+<div id="edit-modal" onclick="handleModalBg(event)">
+  <div id="edit-modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="edit-header">
+      <h3 id="edit-modal-title">Editar registro</h3>
+      <button class="edit-close" onclick="closeEditModal()">✕</button>
+    </div>
+
+    <div class="edit-lbl">Finasteride</div>
+    <div class="btn-row">
+      <button class="btn" id="edit-fin-btn" onclick="toggleEditFin()">Marcar toma</button>
+    </div>
+
+    <div class="edit-lbl">Minoxidil</div>
+    <div id="edit-mino-list"></div>
+    <button class="btn btn-mino-ghost" id="edit-add-mino-btn" onclick="addEditMino()">+ Agregar aplicación</button>
+
+    <div class="edit-lbl">Nota del día</div>
+    <textarea class="note-textarea" id="edit-note-input" rows="3" placeholder="Notas opcionales..." style="margin-top:0"></textarea>
+
+    <button class="edit-save" onclick="saveEditRecord()">Guardar cambios</button>
+  </div>
+</div>
+
+<input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)">
+
+<script>
+// ═══════════════════════════════════════
+// ICONS
+// ═══════════════════════════════════════
+const IC_PILL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="8" width="19" height="8" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/></svg>';
+const IC_DROP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.7s-6.5 7.2-6.5 11.3a6.5 6.5 0 0 0 13 0C18.5 9.9 12 2.7 12 2.7z"/></svg>';
+const IC_FLAME = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c0 3-4 4.5-4 8.5a4 4 0 0 0 .8 2.4C7 12 6.5 10.5 6.5 9c-2 2-3 4.2-3 6.5a8.5 8.5 0 0 0 17 0c0-4.5-3.5-7.5-5-11-0.8 2.5-2.5 3.5-3.5 2.5C12.8 5.5 13 3.5 12 2z"/></svg>';
+const IC_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+
+// ═══════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════
+const DATA_KEY = 'ht_data_v3';
+const SET_KEY  = 'ht_settings_v2';
+
+const load  = () => { try { return JSON.parse(localStorage.getItem(DATA_KEY)) || {}; } catch { return {}; } };
+const save  = d => localStorage.setItem(DATA_KEY, JSON.stringify(d));
+const loadS = () => { const def={startDate:'',notifAM:'08:00',notifPM:'21:00',notifEnabled:false}; try{return {...def,...(JSON.parse(localStorage.getItem(SET_KEY))||{})};}catch{return def;}};
+const saveS = s => localStorage.setItem(SET_KEY, JSON.stringify(s));
+function saveSetting(k,v){const s=loadS();s[k]=v;saveS(s);}
+
+(function(){ const old=localStorage.getItem('ht_data_v2'); if(old&&!localStorage.getItem(DATA_KEY)) localStorage.setItem(DATA_KEY,old); })();
+
+function getE(data, key) {
+  const raw = data[key];
+  if (!raw) return { fin: false, mino_apps: [], note: '', photo: null };
+  if (Array.isArray(raw.mino_apps)) return raw;
+  const apps = [];
+  if (raw.mino_am) apps.push({ time: '08:00' });
+  if (raw.mino_pm) apps.push({ time: '21:00' });
+  return { fin: raw.fin || false, mino_apps: apps, note: raw.note || '', photo: raw.photo || null };
+}
+function setE(data, key, e) { data[key] = e; save(data); }
+
+// ═══════════════════════════════════════
+// DATE HELPERS
+// ═══════════════════════════════════════
+const pad = n => String(n).padStart(2,'0');
+function todayKey() { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function fmtKey(d)  { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function addDays(key,n) { const d=new Date(key+'T12:00:00'); d.setDate(d.getDate()+n); return fmtKey(d); }
+function ago(n) { return addDays(todayKey(),-n); }
+function dow(key) { return new Date(key+'T12:00:00').getDay(); }
+function dimMonth(y,m) { return new Date(y,m,0).getDate(); }
+function dateDiff(a,b) { return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000); }
+function nowTime() { const n=new Date(); return `${pad(n.getHours())}:${pad(n.getMinutes())}`; }
+
+const MES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MES3 = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DIA3 = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+function fmtDisp(key) { const [y,m,d]=key.split('-').map(Number); return `${d} ${MES3[m-1]} ${y}`; }
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='hoy')  { renderHero(); renderTodayCards(); renderStats(); }
+  if(name==='mes')  renderMonth();
+  if(name==='mapa') { renderHM('hm-fin','fin'); renderHM('hm-mino','mino'); }
+  if(name==='tend') renderTrend();
+  if(name==='hist') renderHistory();
+  if(name==='ajus') renderSettings();
+}
+function renderAll() { renderHero(); renderTodayCards(); renderStats(); }
+
+// ═══════════════════════════════════════
+// HERO
+// ═══════════════════════════════════════
+function renderHero() {
+  const data=load(); const s=loadS(); const today=todayKey();
+  const e=getE(data,today);
+  let finStreak=0, minoStreak=0;
+  for(let i=0;i<730;i++){if(getE(data,ago(i)).fin)finStreak++;else break;}
+  for(let i=0;i<730;i++){if(getE(data,ago(i)).mino_apps.length>0)minoStreak++;else break;}
+  const daysSince = s.startDate ? dateDiff(s.startDate, today) : null;
+
+  const done=(e.fin?1:0)+Math.min(e.mino_apps.length,2);
+  const total=3;
+  const R=36, C=2*Math.PI*R;
+  const off=C*(1-done/total);
+
+  const ring=`
+    <div class="hero-ring">
+      <svg viewBox="0 0 84 84">
+        <defs>
+          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#8b5cf6"/>
+          </linearGradient>
+        </defs>
+        <circle cx="42" cy="42" r="${R}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="7"/>
+        <circle cx="42" cy="42" r="${R}" fill="none" stroke="url(#ringGrad)" stroke-width="7" stroke-linecap="round"
+          stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"
+          style="transition:stroke-dashoffset 0.7s cubic-bezier(0.22,1,0.36,1)"/>
+      </svg>
+      <div class="hero-ring-center">
+        <span class="hero-ring-frac tnum">${done}/${total}</span>
+        <span class="hero-ring-lbl">Hoy</span>
+      </div>
+    </div>`;
+
+  const topLeft = daysSince!==null
+    ? `<div><div class="hero-day-num tnum">${daysSince}</div><div class="hero-day-lbl">días de tratamiento</div></div>`
+    : `<div><div class="hero-day-num">Hola 👋</div><div class="hero-day-lbl">Configurá tu fecha de inicio en Ajustes</div></div>`;
+
+  document.getElementById('hoy-hero').innerHTML=`
+    <div class="hero">
+      <div class="hero-top">
+        ${topLeft}
+        ${ring}
+      </div>
+      <div class="hero-streaks">
+        <div class="streak-pill">
+          <div class="streak-ic fin">${IC_FLAME}</div>
+          <div class="streak-info"><span class="streak-val tnum">${finStreak} ${finStreak===1?'día':'días'}</span><span class="streak-cap">Racha Finasteride</span></div>
+        </div>
+        <div class="streak-pill">
+          <div class="streak-ic mino">${IC_DROP}</div>
+          <div class="streak-info"><span class="streak-val tnum">${minoStreak} ${minoStreak===1?'día':'días'}</span><span class="streak-cap">Racha Minoxidil</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════
+// TODAY CARDS
+// ═══════════════════════════════════════
+function renderTodayCards() {
+  const data=load(); const key=todayKey(); const e=getE(data,key);
+  const apps=e.mino_apps||[];
+
+  const appsHtml=apps.map((app,i)=>`
+    <div class="app-entry">
+      <div class="app-entry-dot"></div>
+      <div class="app-entry-info">
+        <span class="app-entry-num">Aplicación ${i+1}</span>
+        <span class="app-entry-time tnum">${app.time}</span>
+      </div>
+      <button class="app-remove" onclick="removeMino(${i})">×</button>
+    </div>`).join('');
+
+  const addBtn=apps.length<2
+    ?`<button class="btn ${apps.length>0?'btn-mino-ghost':'btn-mino'}" onclick="addMino()" style="margin-top:${apps.length>0?'4':'0'}px">${apps.length===0?'＋ Marcar aplicación':'＋ Segunda aplicación'}</button>`
+    :'';
+
+  const minoMsgs=['Sin aplicar hoy','1 aplicación registrada','Completo · 2 aplicaciones'];
+  const minoDone=apps.length>=1;
+
+  const photoHTML=e.photo
+    ?`<img class="photo-thumb" src="${e.photo}" onclick="openModal('${key}')">`
+    :`<div class="photo-add" onclick="triggerPhoto('${key}')">+</div>`;
+
+  document.getElementById('hoy-cards').innerHTML=`
+    <div class="card">
+      <div class="med-head">
+        <div class="med-icon fin">${IC_PILL}</div>
+        <div class="med-titles"><div class="drug-name">Finasteride</div><div class="drug-sub">1 mg · una vez al día</div></div>
+        <div class="med-check ${e.fin?'on-fin':'off'}">${e.fin?'✓':''}</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn ${e.fin?'btn-fin':''}" onclick="toggleFin()">${e.fin?'✓ Tomado':'Marcar toma'}</button>
+        ${e.fin?`<button class="btn btn-undo" onclick="undoFin()">↩</button>`:''}
+      </div>
+      <div class="status-text"><span class="status-dot ${e.fin?'done':''}"></span>${e.fin?'Registrado hoy':'Sin registrar hoy'}</div>
+    </div>
+
+    <div class="card">
+      <div class="med-head">
+        <div class="med-icon mino">${IC_DROP}</div>
+        <div class="med-titles"><div class="drug-name">Minoxidil</div><div class="drug-sub">Tópico · hasta 2 al día</div></div>
+        <div class="med-check ${minoDone?'on-mino':'off'}">${apps.length||''}</div>
+      </div>
+      ${appsHtml}
+      ${addBtn}
+      <div class="status-text"><span class="status-dot ${minoDone?'done':''}"></span>${minoMsgs[apps.length]}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Nota del día & foto de progreso</div>
+      <div class="photo-row">
+        ${photoHTML}
+        <div class="photo-meta">
+          ${e.photo?'Foto guardada · tocá para ver':'Agregá una foto de progreso (opcional)'}
+          ${e.photo?`<br><button class="btn-sm" onclick="removePhoto('${key}')">Quitar foto</button>`:''}
+        </div>
+      </div>
+      <textarea class="note-textarea" rows="2" placeholder="Notas del día... efectos, sensaciones, recordatorios" onchange="saveNote('${key}',this.value)">${e.note||''}</textarea>
+    </div>`;
+}
+
+// ═══════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════
+function renderStats() {
+  const data=load();
+  let fin=0, minoTotal=0;
+  for(let i=0;i<90;i++){const e=getE(data,ago(i));if(e.fin)fin++;minoTotal+=e.mino_apps.length;}
+  const fPct=Math.round(fin/90*100);
+  const mPct=Math.round(minoTotal/180*100);
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat-card">
+      <div class="stat-top"><span class="stat-val tnum" style="color:var(--fin-soft)">${fPct}%</span><span class="stat-sub tnum">${fin}/90</span></div>
+      <div class="stat-lbl">Adherencia Finasteride</div>
+      <div class="stat-bar"><div class="stat-bar-fill fin" style="width:${fPct}%"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-top"><span class="stat-val tnum" style="color:var(--mino-soft)">${mPct}%</span><span class="stat-sub tnum">${minoTotal}/180</span></div>
+      <div class="stat-lbl">Cobertura Minoxidil</div>
+      <div class="stat-bar"><div class="stat-bar-fill mino" style="width:${mPct}%"></div></div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════
+// TODAY ACTIONS
+// ═══════════════════════════════════════
+function toggleFin() { const d=load();const k=todayKey();const e=getE(d,k);e.fin=!e.fin;setE(d,k,e);renderAll(); }
+function undoFin()   { const d=load();const k=todayKey();const e=getE(d,k);e.fin=false;setE(d,k,e);renderAll(); }
+function addMino() { const d=load();const k=todayKey();const e=getE(d,k); if(e.mino_apps.length>=2)return; e.mino_apps.push({time:nowTime()}); setE(d,k,e);renderAll(); }
+function removeMino(i) { const d=load();const k=todayKey();const e=getE(d,k); e.mino_apps.splice(i,1); setE(d,k,e);renderAll(); }
+function saveNote(key,val){const d=load();const e=getE(d,key);e.note=val;setE(d,key,e);}
+
+// ═══════════════════════════════════════
+// MONTHLY CALENDAR
+// ═══════════════════════════════════════
+let calY=new Date().getFullYear(), calM=new Date().getMonth()+1, calSel=null;
+function monthNav(dir){calM+=dir;if(calM>12){calM=1;calY++;}if(calM<1){calM=12;calY--;}renderMonth();}
+
+function renderMonth() {
+  const data=load();const today=todayKey();
+  const total=dimMonth(calY,calM);
+  const firstKey=`${calY}-${pad(calM)}-01`;
+  const startDow=dow(firstKey);
+
+  document.getElementById('cal-title').textContent=`${MES[calM-1]} ${calY}`;
+
+  let html=DIA3.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for(let i=0;i<startDow;i++) html+=`<div class="cal-day empty"></div>`;
+
+  for(let d=1;d<=total;d++){
+    const key=`${calY}-${pad(calM)}-${pad(d)}`;
+    const isFuture=key>today, isToday=key===today, isSel=key===calSel;
+    const e=getE(data,key); const mn=e.mino_apps.length;
+    let bg='';
+    if(!isFuture){
+      if(e.fin&&mn>0) bg='background:linear-gradient(135deg,var(--fin-bg),var(--mino-bg))';
+      else if(e.fin)  bg='background:var(--fin-bg)';
+      else if(mn>0)   bg='background:var(--mino-bg)';
+    }
+    const cls=['cal-day',isFuture?'future':'',isToday?'today':'',isSel?'selected':''].filter(Boolean).join(' ');
+    const dots=isFuture?'':
+      `<div class="cal-dots"><div class="dot ${e.fin?'dot-fin':'dot-off'}"></div><div class="dot ${mn>0?'dot-mino':'dot-off'}"></div></div>`;
+    html+=`<div class="${cls}" style="${bg}" onclick="selectCalDay('${key}')">${d}${dots}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML=html;
+  if(calSel) renderCalDetail(calSel);
+}
+
+function selectCalDay(key){
+  if(key>todayKey())return;
+  calSel=(calSel===key)?null:key;
+  calSel?renderCalDetail(calSel):document.getElementById('cal-detail').innerHTML='';
+  renderMonth();
+}
+
+function renderCalDetail(key){
+  const data=load();const e=getE(data,key);const mn=e.mino_apps.length;
+  const appsStr=mn>0
+    ?e.mino_apps.map((a,i)=>`<span class="badge b-mino">Mino ${i+1} · ${a.time}</span>`).join('')
+    :`<span class="badge b-miss">Minoxidil ✗</span>`;
+  let html=`<div class="card day-detail">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px">
+      <div class="card-label" style="margin:0">${fmtDisp(key)}</div>
+      <button class="hist-edit-btn" onclick="openEditModal('${key}')">${IC_EDIT} Editar</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${e.note||e.photo?'12px':'0'}">
+      ${e.fin?`<span class="badge b-fin">Finasteride ✓</span>`:`<span class="badge b-miss">Finasteride ✗</span>`}
+      ${appsStr}
+    </div>`;
+  if(e.note) html+=`<div style="font-size:0.8rem;color:var(--text-muted);font-style:italic;margin-bottom:10px">"${e.note}"</div>`;
+  if(e.photo) html+=`<img class="photo-thumb" src="${e.photo}" onclick="openModal('${key}')" style="width:84px;height:84px">`;
+  html+='</div>';
+  document.getElementById('cal-detail').innerHTML=html;
+}
+
+// ═══════════════════════════════════════
+// HEATMAP
+// ═══════════════════════════════════════
+function renderHM(id, type) {
+  const data=load();const today=todayKey();
+  const startRaw=ago(90);
+  const startKey=addDays(startRaw,-dow(startRaw));
+  const endKey=addDays(today,6-dow(today));
+
+  const weeks=[];let cur=startKey;
+  while(cur<=endKey){const w=[];for(let d=0;d<7;d++){w.push(cur);cur=addDays(cur,1);}weeks.push(w);}
+
+  let lastM=null,mHtml='<div class="hm-months">';
+  weeks.forEach(w=>{
+    const m=parseInt(w[0].split('-')[1]);
+    mHtml+=`<span class="hm-month-lbl" style="width:${13+3}px">${m!==lastM?MES3[m-1]:''}</span>`;
+    lastM=m;
+  });
+  mHtml+='</div>';
+
+  let bHtml='<div class="hm-body">';
+  weeks.forEach(w=>{
+    bHtml+='<div class="hm-week">';
+    w.forEach(k=>{
+      if(k>today){bHtml+=`<div class="hm-cell future"></div>`;return;}
+      const e=getE(data,k);
+      let cls,tip;
+      if(type==='fin'){
+        cls=e.fin?'fc-1':'fc-0';
+        tip=`${fmtDisp(k)}: ${e.fin?'Tomado':'No registrado'}`;
+      } else {
+        const n=Math.min(e.mino_apps.length,2);
+        cls=`mc-${n}`;
+        const ts=e.mino_apps.length>0?' ('+e.mino_apps.map(a=>a.time).join(', ')+')':'';
+        tip=`${fmtDisp(k)}: ${['No aplicado','1 aplicación','2 aplicaciones'][n]}${ts}`;
+      }
+      bHtml+=`<div class="hm-cell ${cls}" data-tip="${tip}"></div>`;
+    });
+    bHtml+='</div>';
+  });
+  bHtml+='</div>';
+
+  const legend=type==='fin'
+    ?`<span>No</span><div class="hm-legend-cell fc-0"></div><div class="hm-legend-cell fc-1"></div><span>Tomado</span>`
+    :`<span>0</span><div class="hm-legend-cell mc-0"></div><div class="hm-legend-cell mc-1"></div><div class="hm-legend-cell mc-2"></div><span>2 aplic.</span>`;
+
+  document.getElementById(id).innerHTML=mHtml+bHtml+`<div class="hm-legend">${legend}</div>`;
+}
+
+// ═══════════════════════════════════════
+// TREND CHART
+// ═══════════════════════════════════════
+function renderTrend() {
+  const data=load();const today=todayKey();const W=12;
+  const weeks=[];
+  for(let w=W-1;w>=0;w--){
+    let fin=0,mino=0,days=0;
+    for(let d=0;d<7;d++){
+      const k=ago(w*7+d);if(k>today)continue;days++;
+      const e=getE(data,k);if(e.fin)fin++;mino+=e.mino_apps.length;
+    }
+    const k=ago(w*7+6);const[,m,d]=k.split('-').map(Number);
+    weeks.push({fin:days?Math.round(fin/days*100):0,mino:days?Math.round(mino/(days*2)*100):0,lbl:days?`${d}/${m}`:''});
+  }
+  const VW=760,VH=210,pt=14,pr=8,pb=34,pl=34;
+  const cW=VW-pl-pr,cH=VH-pt-pb;
+  const bW=Math.max(5,Math.floor(cW/(W*2+W+1))-1);
+  const step=cW/W;
+  let svg=`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;min-width:380px;height:auto;display:block">`;
+  svg+=`<defs>
+    <linearGradient id="fgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#6d28d9"/></linearGradient>
+    <linearGradient id="mgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#0891b2"/></linearGradient>
+  </defs>`;
+  [0,25,50,75,100].forEach(v=>{
+    const y=pt+cH-(v/100)*cH;
+    svg+=`<line x1="${pl}" y1="${y}" x2="${VW-pr}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+    svg+=`<text x="${pl-5}" y="${y+4}" text-anchor="end" font-size="9" fill="#8c88a8">${v}%</text>`;
+  });
+  weeks.forEach((wk,i)=>{
+    const gx=pl+i*step;
+    const fH=(wk.fin/100)*cH;const mH=(wk.mino/100)*cH;
+    if(fH>0) svg+=`<rect x="${gx}" y="${pt+cH-fH}" width="${bW}" height="${fH}" rx="3" fill="url(#fgrad)"/>`;
+    if(mH>0) svg+=`<rect x="${gx+bW+3}" y="${pt+cH-mH}" width="${bW}" height="${mH}" rx="3" fill="url(#mgrad)"/>`;
+    if(wk.lbl) svg+=`<text x="${gx+bW}" y="${VH-8}" text-anchor="middle" font-size="8.5" fill="#8c88a8">${wk.lbl}</text>`;
+  });
+  svg+='</svg>';
+  document.getElementById('trend-chart').innerHTML=svg;
+}
+
+// ═══════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════
+let histLimit=20;
+function renderHistory() {
+  const data=load();let html='';
+  for(let i=0;i<Math.min(histLimit,90);i++){
+    const k=ago(i);const e=getE(data,k);const[y,m,d]=k.split('-').map(Number);
+    const mn=e.mino_apps.length;
+    const minobadges=mn>0
+      ?e.mino_apps.map((a,idx)=>`<span class="badge b-mino">Mino ${idx+1} · ${a.time}</span>`).join('')
+      :`<span class="badge b-miss">Mino ✗</span>`;
+    html+=`<div class="hist-row">
+      <div class="hist-date"><div class="d tnum">${d}</div><div class="m">${MES3[m-1]}</div><div class="y tnum">${i===0?'hoy':y}</div></div>
+      <div class="hist-divider"></div>
+      <div class="hist-body">
+        <div class="hist-badges">
+          ${e.fin?`<span class="badge b-fin">Fin ✓</span>`:`<span class="badge b-miss">Fin ✗</span>`}
+          ${minobadges}
+        </div>
+        ${e.note?`<div class="hist-note">"${e.note}"</div>`:''}
+        <button class="hist-edit-btn" onclick="openEditModal('${k}')">${IC_EDIT} Editar</button>
+      </div>
+      ${e.photo?`<img class="hist-photo" src="${e.photo}" onclick="openModal('${k}')">`:``}
+    </div>`;
+  }
+  if(!html) html='<div style="text-align:center;color:var(--text-muted);padding:24px;font-size:0.82rem">Sin registros aún</div>';
+  const more=histLimit<90?`<button class="show-more-btn" onclick="histLimit+=20;renderHistory()">Mostrar más</button>`:'';
+  document.getElementById('hist-list').innerHTML=html+more;
+}
+
+// ═══════════════════════════════════════
+// EDIT MODAL
+// ═══════════════════════════════════════
+let editKey=null, editEntry=null;
+function openEditModal(key) {
+  const data=load();
+  editKey=key;
+  editEntry=JSON.parse(JSON.stringify(getE(data,key)));
+  const[y,m,d]=key.split('-').map(Number);
+  document.getElementById('edit-modal-title').textContent=`${d} ${MES3[m-1]} ${y}`;
+  renderEditSheet();
+  document.getElementById('edit-modal').classList.add('open');
+}
+function renderEditSheet() {
+  const fb=document.getElementById('edit-fin-btn');
+  fb.className=`btn ${editEntry.fin?'btn-fin':''}`;
+  fb.textContent=editEntry.fin?'✓ Tomado':'Marcar toma';
+  let html='';
+  editEntry.mino_apps.forEach((app,i)=>{
+    html+=`<div class="edit-app-row">
+      <span class="edit-app-label">Aplicación ${i+1}</span>
+      <input type="time" value="${app.time}" onchange="updateEditMinoTime(${i},this.value)">
+      <button class="edit-app-remove" onclick="removeEditMino(${i})">×</button>
+    </div>`;
+  });
+  document.getElementById('edit-mino-list').innerHTML=html;
+  document.getElementById('edit-add-mino-btn').style.display=editEntry.mino_apps.length>=2?'none':'flex';
+  document.getElementById('edit-note-input').value=editEntry.note||'';
+}
+function toggleEditFin(){editEntry.fin=!editEntry.fin;renderEditSheet();}
+function addEditMino(){if(editEntry.mino_apps.length>=2)return;editEntry.mino_apps.push({time:nowTime()});renderEditSheet();}
+function removeEditMino(i){editEntry.mino_apps.splice(i,1);renderEditSheet();}
+function updateEditMinoTime(i,val){editEntry.mino_apps[i].time=val;}
+function saveEditRecord(){
+  editEntry.note=document.getElementById('edit-note-input').value;
+  const data=load(); data[editKey]=editEntry; save(data);
+  closeEditModal();
+  renderAll();
+  const activeId=document.querySelector('.section.active').id;
+  if(activeId==='sec-hist') renderHistory();
+  if(activeId==='sec-mes')  {renderMonth(); if(calSel===editKey) renderCalDetail(editKey);}
+  if(activeId==='sec-mapa') {renderHM('hm-fin','fin');renderHM('hm-mino','mino');}
+  if(activeId==='sec-tend') renderTrend();
+}
+function closeEditModal(){document.getElementById('edit-modal').classList.remove('open');editKey=null;editEntry=null;}
+function handleModalBg(e){if(e.target===document.getElementById('edit-modal'))closeEditModal();}
+
+// ═══════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════
+function renderSettings(){
+  const s=loadS();
+  document.getElementById('set-start').value=s.startDate||'';
+  document.getElementById('set-am').value=s.notifAM||'08:00';
+  document.getElementById('set-pm').value=s.notifPM||'21:00';
+  document.getElementById('set-notif').checked=s.notifEnabled||false;
+  updateNotifLabel();
+}
+function updateNotifLabel(){
+  const perm='Notification'in window?Notification.permission:'unsupported';
+  const s=loadS();const el=document.getElementById('notif-status');if(!el)return;
+  if(perm==='unsupported')el.textContent='No disponible en este navegador';
+  else if(perm==='denied')el.textContent='Bloqueadas — habilitá en ajustes del navegador';
+  else if(perm==='granted'&&s.notifEnabled)el.textContent=`Activas · ${s.notifAM} y ${s.notifPM}`;
+  else el.textContent='Desactivadas';
+}
+async function toggleNotif(enabled){
+  if(enabled&&'Notification'in window){
+    const p=await Notification.requestPermission();
+    if(p!=='granted'){document.getElementById('set-notif').checked=false;saveSetting('notifEnabled',false);updateNotifLabel();return;}
+  }
+  saveSetting('notifEnabled',enabled);
+  updateNotifLabel();
+  if(enabled) startNotifLoop();
+}
+function startNotifLoop(){
+  setInterval(()=>{
+    const s=loadS();if(!s.notifEnabled||Notification.permission!=='granted')return;
+    const now=new Date();const hm=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const data=load();const e=getE(data,todayKey());
+    if(hm===s.notifAM&&e.mino_apps.length===0) new Notification('Hair Tracker',{body:'Recordatorio: aplicar Minoxidil AM.'});
+    if(hm===s.notifPM&&(!e.fin||e.mino_apps.length<2)) new Notification('Hair Tracker',{body:'Recordatorio: tomar Finasteride y aplicar Minoxidil PM.'});
+  },60000);
+}
+
+// ═══════════════════════════════════════
+// PHOTOS
+// ═══════════════════════════════════════
+let photoKey=null;
+function triggerPhoto(key){photoKey=key;document.getElementById('photo-input').click();}
+function handlePhoto(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=500,c=document.createElement('canvas');
+      let w=img.width,h=img.height;
+      if(w>h){if(w>MAX){h=h*MAX/w;w=MAX;}}else{if(h>MAX){w=w*MAX/h;h=MAX;}}
+      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      const compressed=c.toDataURL('image/jpeg',0.75);
+      const data=load();const entry=getE(data,photoKey);entry.photo=compressed;setE(data,photoKey,entry);
+      renderTodayCards();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);ev.target.value='';
+}
+function removePhoto(key){const d=load();const e=getE(d,key);e.photo=null;setE(d,key,e);renderTodayCards();}
+function openModal(key){
+  const e=getE(load(),key);if(!e.photo)return;
+  document.getElementById('modal-img').src=e.photo;
+  document.getElementById('photo-modal').classList.add('open');
+}
+function closeModal(){document.getElementById('photo-modal').classList.remove('open');}
+document.getElementById('photo-modal').onclick=e=>{if(e.target===e.currentTarget)closeModal();};
+
+// ═══════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════
+function exportCSV(){
+  const data=load();let csv='Fecha,Finasteride,Mino_Aplicacion_1,Mino_Aplicacion_2,Nota\n';
+  for(let i=89;i>=0;i--){
+    const k=ago(i);const e=getE(data,k);
+    const t1=e.mino_apps[0]?.time||'';const t2=e.mino_apps[1]?.time||'';
+    csv+=`${k},${e.fin?1:0},"${t1}","${t2}","${(e.note||'').replace(/"/g,'""')}"\n`;
+  }
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`hair-tracker-${todayKey()}.csv`;
+  a.click();
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+renderAll();
+const _s=loadS();
+if(_s.notifEnabled&&'Notification'in window&&Notification.permission==='granted') startNotifLoop();
+</script>
+</body>
+</html>
